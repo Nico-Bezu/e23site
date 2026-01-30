@@ -1,13 +1,35 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { getUpcomingEvents, getPastEvents, getEventRSVPs, isRedisConfigured } from "@/lib/events";
+import { EventCard } from "@/components/event-card";
+import { PastEvents } from "@/components/past-events";
 
-export default function EventsPage() {
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function EventsPage() {
+  const configured = await isRedisConfigured()
+  const upcomingEvents = configured ? await getUpcomingEvents() : []
+  const pastEvents = configured ? await getPastEvents() : []
+
+  // Get RSVP counts for all upcoming events
+  const rsvpCounts = configured
+    ? await Promise.all(
+        upcomingEvents.map(async (event) => ({
+          eventId: event.id,
+          ...(await getEventRSVPs(event.id)),
+        }))
+      )
+    : []
+
+  const getRSVPCount = (eventId: string) => {
+    const counts = rsvpCounts.find((c) => c.eventId === eventId)
+    return counts ? { going: counts.going, maybe: counts.maybe } : undefined
+  }
+
   return (
     <main className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b">
+      <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold">
             E23
@@ -32,38 +54,29 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {/* Events will be loaded here */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle>Sample Event</CardTitle>
-                    <CardDescription>
-                      Friday, Feb 14 at 9:00 PM
-                    </CardDescription>
-                  </div>
-                  <Badge>Chill</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Location: Common Room
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button size="sm">Going</Button>
-                  <Button size="sm" variant="outline">Maybe</Button>
-                  <Button size="sm" variant="ghost">Can&apos;t Make It</Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  0 going · 0 maybe
-                </p>
-              </CardContent>
-            </Card>
+          {!configured && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mb-6">
+              <p className="text-amber-200 text-sm">
+                Redis not configured. Add your Upstash credentials to .env.local to enable events.
+              </p>
+            </div>
+          )}
 
-            <p className="text-center text-muted-foreground py-8">
-              Events will be loaded from Upstash Redis once configured.
-            </p>
+          <div className="space-y-4">
+            {upcomingEvents.length > 0 ? (
+              upcomingEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  rsvpCounts={getRSVPCount(event.id)}
+                  showCountdown
+                />
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground py-12">
+                No upcoming events. Check back later!
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -71,10 +84,10 @@ export default function EventsPage() {
       {/* Past Events */}
       <section className="px-4 py-8 border-t">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-xl font-bold mb-4">Past Events</h2>
-          <p className="text-muted-foreground">
-            No past events yet.
-          </p>
+          <PastEvents events={pastEvents} />
+          {pastEvents.length === 0 && (
+            <p className="text-muted-foreground text-sm">No past events yet.</p>
+          )}
         </div>
       </section>
     </main>
