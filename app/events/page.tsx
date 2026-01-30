@@ -11,19 +11,18 @@ export default async function EventsPage() {
   const upcomingEvents = configured ? await getUpcomingEvents() : []
   const pastEvents = configured ? await getPastEvents() : []
 
-  // Get RSVP counts for all upcoming events
-  const rsvpCounts = configured
+  // Get RSVPs for all upcoming events
+  const eventRSVPs = configured
     ? await Promise.all(
         upcomingEvents.map(async (event) => ({
           eventId: event.id,
-          ...(await getEventRSVPs(event.id)),
+          rsvps: (await getEventRSVPs(event.id)).rsvps,
         }))
       )
     : []
 
-  const getRSVPCount = (eventId: string) => {
-    const counts = rsvpCounts.find((c) => c.eventId === eventId)
-    return counts ? { going: counts.going, maybe: counts.maybe } : undefined
+  const getRSVPs = (eventId: string) => {
+    return eventRSVPs.find((e) => e.eventId === eventId)?.rsvps || []
   }
 
   return (
@@ -68,8 +67,9 @@ export default async function EventsPage() {
                 <EventCard
                   key={event.id}
                   event={event}
-                  rsvpCounts={getRSVPCount(event.id)}
+                  rsvps={getRSVPs(event.id)}
                   showCountdown
+                  showRSVP
                 />
               ))
             ) : (

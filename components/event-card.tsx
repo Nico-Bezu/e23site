@@ -1,16 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CountdownTimer } from "./countdown-timer"
+import { RSVPButtons } from "./rsvp-buttons"
 import { format, isPast } from "date-fns"
-import type { Event } from "@/lib/redis"
+import type { Event, RSVP } from "@/lib/redis"
 
 interface EventCardProps {
   event: Event
-  rsvpCounts?: {
-    going: number
-    maybe: number
-  }
+  rsvps?: RSVP[]
   showCountdown?: boolean
+  showRSVP?: boolean
 }
 
 const vibeColors: Record<string, string> = {
@@ -23,10 +22,13 @@ const vibeColors: Record<string, string> = {
   default: "bg-muted text-muted-foreground",
 }
 
-export function EventCard({ event, rsvpCounts, showCountdown = true }: EventCardProps) {
+export function EventCard({ event, rsvps = [], showCountdown = true, showRSVP = true }: EventCardProps) {
   const eventDate = new Date(event.date)
   const isEventPast = isPast(eventDate)
   const vibeColor = vibeColors[event.vibeTag?.toLowerCase()] || vibeColors.default
+
+  const goingCount = rsvps.filter(r => r.status === 'going').length
+  const maybeCount = rsvps.filter(r => r.status === 'maybe').length
 
   return (
     <Card className={isEventPast ? "opacity-60" : ""}>
@@ -52,7 +54,7 @@ export function EventCard({ event, rsvpCounts, showCountdown = true }: EventCard
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {event.location && (
           <p className="text-sm text-muted-foreground">
             📍 {event.location}
@@ -66,9 +68,16 @@ export function EventCard({ event, rsvpCounts, showCountdown = true }: EventCard
             🎒 Bring: {event.bringNotes}
           </p>
         )}
-        {rsvpCounts && (
+
+        {showRSVP && !isEventPast && (
+          <div className="pt-3 border-t">
+            <RSVPButtons eventId={event.id} currentRSVPs={rsvps} />
+          </div>
+        )}
+
+        {(goingCount > 0 || maybeCount > 0) && !showRSVP && (
           <p className="text-xs text-muted-foreground pt-2 border-t">
-            {rsvpCounts.going} going · {rsvpCounts.maybe} maybe
+            {goingCount} going · {maybeCount} maybe
           </p>
         )}
       </CardContent>
